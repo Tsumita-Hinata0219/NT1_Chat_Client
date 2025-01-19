@@ -86,7 +86,6 @@ int main()
 
 	// サーバー側との文字列のやりとり
 	while (1) {
-
 		int nRcv = 0;
 		char szBuf[1024]{};
 
@@ -97,8 +96,14 @@ int main()
 		send(sockfd, szBuf, (int)strlen(szBuf), 0);
 
 		nRcv = recv(sockfd, szBuf, sizeof(szBuf) - 1, 0);
-		szBuf[nRcv] = '\0';
-		printf("受信 : %s\n", szBuf);
+		if (nRcv > 0) {
+			szBuf[nRcv] = '\0';
+			printf("受信 : %s\n", szBuf);
+		}
+		else {
+			printf("サーバーからの受信に失敗しました\n");
+			break;
+		}
 	}
 
 
