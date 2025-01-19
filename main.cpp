@@ -22,6 +22,20 @@ static SOCKET CreateSocket()
 	return mySocket;
 }
 
+// サーバーのホスト情報を取得
+HOSTENT* GetHostByNameOrAddress(const char* ipAddress) {
+	HOSTENT* lpHost{};
+	unsigned int addr;
+
+	lpHost = gethostbyname(ipAddress);
+	if (lpHost == NULL) {
+		addr = inet_addr(ipAddress);
+		lpHost = gethostbyaddr((char*)&addr, 4, AF_INET);
+	}
+
+	return lpHost;
+}
+
 // クラインとソケットをサーバーに接続
 static void ConnectToServer(SOCKET sockfd, const char* ipAddress, int portNumber) {
 	sockaddr_in server_addr{};
@@ -33,6 +47,9 @@ static void ConnectToServer(SOCKET sockfd, const char* ipAddress, int portNumber
 	if (connect(sockfd, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
 		printf("サーバーと接続できませんでした\n");
 		closesocket(sockfd);
+	}
+	else {
+		printf("サーバーと接続しました\n");
 	}
 }
 
@@ -58,11 +75,28 @@ int main()
 	SOCKET sockfd = CreateSocket();
 
 	/* サーバーを名前で取得する */
-	HOSTENT* ipHost{};
-	ipHost = gethostbyname(IPAddr);
+	HOSTENT* lpHost = GetHostByNameOrAddress(IPAddr);
 
 	/* クラインとソケットをサーバーに接続 */
 	ConnectToServer(sockfd, IPAddr, portNumber);
+
+
+	// サーバー側との文字列のやりとり
+	while (1) {
+
+		int nRcv = 0;
+		char szBuf[1024]{};
+
+		printf("送信 : ");
+		scanf_s("%s", szBuf, 1024);
+		fflush(stdin);
+
+		send(sockfd, szBuf, (int)strlen(szBuf), 0);
+
+		nRcv = recv(sockfd, szBuf, sizeof(szBuf) - 1, 0);
+		szBuf[nRcv] = '\0';
+		printf("受信 : %s\n", szBuf);
+	}
 
 
 	closesocket(sockfd);
