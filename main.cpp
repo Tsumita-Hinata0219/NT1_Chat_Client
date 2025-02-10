@@ -12,74 +12,43 @@
 // チャットプログラム　クライアント関数
 void ChatClient()
 {
-    SOCKET s;
-    SOCKADDR_IN saddr;
-    u_short uport = 8080;
-    char szServer[1024] = { "192.168.3.4"};
-    unsigned int addr;
+    int recv_cnt;
+    int send_cnt;
+    int fromlen;
+    SOCKET sock = socket(AF_INET, SOCK_DGRAM, 0); // 修正: int から SOCKET に変更
+    struct sockaddr_in send_addr, recv_addr;
+    char szBuf[512];
 
-    // ポート番号の表示
-    printf("ポート : %d\n", uport);
+    send_addr.sin_family = AF_INET;
+    send_addr.sin_port = htons(8000);
+    send_addr.sin_addr.S_un.S_addr = inet_addr("192.168.3.4"); // 送信アドレスを設定
 
-    // IPアドレスの表示
-    printf("IPアドレス : %s\n", szServer);
+    while (1)
+    {
+        recv_cnt = 0;
+        send_cnt = 0;
+        memset(szBuf, 0, sizeof(szBuf));
+        fromlen = sizeof(recv_addr);
 
-    // ソケットをオープン
-    s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s == INVALID_SOCKET) {
-        printf("ソケットオープンエラー\n");
-        return;
-    }
-
-    // サーバーを名前で取得する
-    HOSTENT* lpHost;
-    lpHost = gethostbyname(szServer);
-    if (lpHost == NULL) {
-        /* サーバーをIPアドレスで取得する */
-        addr = inet_addr(szServer);
-        lpHost = gethostbyaddr((char*)&addr, 4, AF_INET);
-    }
-
-    // クライアントソケットをサーバーに接続
-    memset(&saddr, 0, sizeof(saddr));
-    saddr.sin_family = AF_INET;
-    saddr.sin_port = htons(uport);
-    saddr.sin_addr.s_addr = *((u_long*)lpHost->h_addr);
-
-    if (connect(s, (SOCKADDR*)&saddr, sizeof(saddr)) == SOCKET_ERROR) {
-        printf("サーバーと接続できませんでした\n");
-        closesocket(s);
-        return;
-    }
-
-    printf("サーバーに接続できました\n");
-
-    while (1) {
-        char sendBuf[1024] = { 0 };
-        char recvBuf[1024] = { 0 };
-        int nRcv;
-
-        // 送信データの入力
-        printf("送信 : ");
-        scanf_s("%s", sendBuf, 1024);
+        //送信メッセージ入力
+        printf("送信 --> ");
+        scanf_s("%511s", szBuf, (unsigned int)sizeof(szBuf)); // 修正: フォーマット指定子と引数の型を修正
         fflush(stdin);
 
-        // データを送信
-        send(s, sendBuf, (int)strlen(sendBuf), 0);
-
-        // データを受信
-        nRcv = recv(s, recvBuf, sizeof(recvBuf) - 1, 0);
-        if (nRcv > 0) {
-            recvBuf[nRcv] = '\0';
-            printf("受信 : %s\n", recvBuf);
-        } else {
-            printf("サーバーからの受信に失敗しました\n");
-            break;
+        //データ送信
+        while (send_cnt == 0)
+        {
+            send_cnt = sendto(sock, szBuf, sizeof(szBuf), 0, (struct sockaddr*)&send_addr, sizeof(send_addr));
         }
+
+        //データ受信
+        puts("受信待ち…");
+        memset(szBuf, 0, sizeof(szBuf));
+        recv_cnt = recvfrom(sock, szBuf, sizeof(szBuf) - 1, 0, (struct sockaddr*)&recv_addr, &fromlen);
+        printf("受信 : %s \n", szBuf);
     }
 
-    // ソケットを閉じる
-    closesocket(s);
+    closesocket(sock);
 }
 
 // チャットプログラム メイン関数
