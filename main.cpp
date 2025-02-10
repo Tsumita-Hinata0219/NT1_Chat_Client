@@ -1,114 +1,105 @@
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
+/* 簡易チャットプログラム */
 
-#include <WinSock2.h>
-#include <WS2tcpip.h>
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+
+#include <winsock2.h> /* WinSockのヘッダファイル */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
+#pragma comment ( lib, "WSock32.lib" ) /* WinSockライブラリの指定 */
 
-#pragma comment(lib, "WSock32.lib")
-#pragma comment(lib, "Ws2_32.lib")
-
-
-// ソケットを作成する関数
-static SOCKET CreateSocket()
+// チャットプログラム　クライアント関数
+void ChatClient()
 {
-	// ソケットの作成
-	SOCKET mySocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (mySocket == INVALID_SOCKET) {
-		printf("ソケット作成に失敗しました。エラーコード: %d\n", WSAGetLastError());
-		return INVALID_SOCKET;
-	}
-	printf("socket 成功\n");
-	return mySocket;
+    SOCKET s;
+    SOCKADDR_IN saddr;
+    u_short uport = 8080;
+    char szServer[1024] = { "192.168.3.4"};
+    unsigned int addr;
+
+    // ポート番号の表示
+    printf("ポート : %d\n", uport);
+
+    // IPアドレスの表示
+    printf("IPアドレス : %s\n", szServer);
+
+    // ソケットをオープン
+    s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s == INVALID_SOCKET) {
+        printf("ソケットオープンエラー\n");
+        return;
+    }
+
+    // サーバーを名前で取得する
+    HOSTENT* lpHost;
+    lpHost = gethostbyname(szServer);
+    if (lpHost == NULL) {
+        /* サーバーをIPアドレスで取得する */
+        addr = inet_addr(szServer);
+        lpHost = gethostbyaddr((char*)&addr, 4, AF_INET);
+    }
+
+    // クライアントソケットをサーバーに接続
+    memset(&saddr, 0, sizeof(saddr));
+    saddr.sin_family = AF_INET;
+    saddr.sin_port = htons(uport);
+    saddr.sin_addr.s_addr = *((u_long*)lpHost->h_addr);
+
+    if (connect(s, (SOCKADDR*)&saddr, sizeof(saddr)) == SOCKET_ERROR) {
+        printf("サーバーと接続できませんでした\n");
+        closesocket(s);
+        return;
+    }
+
+    printf("サーバーに接続できました\n");
+
+    while (1) {
+        char sendBuf[1024] = { 0 };
+        char recvBuf[1024] = { 0 };
+        int nRcv;
+
+        // 送信データの入力
+        printf("送信 : ");
+        scanf_s("%s", sendBuf, 1024);
+        fflush(stdin);
+
+        // データを送信
+        send(s, sendBuf, (int)strlen(sendBuf), 0);
+
+        // データを受信
+        nRcv = recv(s, recvBuf, sizeof(recvBuf) - 1, 0);
+        if (nRcv > 0) {
+            recvBuf[nRcv] = '\0';
+            printf("受信 : %s\n", recvBuf);
+        } else {
+            printf("サーバーからの受信に失敗しました\n");
+            break;
+        }
+    }
+
+    // ソケットを閉じる
+    closesocket(s);
 }
 
-// サーバーのホスト情報を取得
-HOSTENT* GetHostByNameOrAddress(const char* ipAddress) {
-	HOSTENT* lpHost{};
-	unsigned int addr;
-
-	lpHost = gethostbyname(ipAddress);
-	if (lpHost == NULL) {
-		addr = inet_addr(ipAddress);
-		lpHost = gethostbyaddr((char*)&addr, 4, AF_INET);
-	}
-
-	return lpHost;
-}
-
-// クラインとソケットをサーバーに接続
-static void ConnectToServer(SOCKET sockfd, const char* ipAddress, int portNumber) {
-	sockaddr_in server_addr{};
-	memset(&server_addr, 0, sizeof(sockaddr_in));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(portNumber);
-	server_addr.sin_addr.s_addr = inet_addr(ipAddress);
-
-	if (connect(sockfd, (SOCKADDR*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
-		printf("サーバーと接続できませんでした\n");
-		closesocket(sockfd);
-	}
-	else {
-		printf("サーバーと接続しました\n");
-	}
-}
-
-
-
-int main()
+// チャットプログラム メイン関数
+int main(void)
 {
-	/* WinSockの初期化 */
-	WSADATA wsaData;
-	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
-		printf("WSAStartupに失敗しました。エラーコード: %d\n", WSAGetLastError());
-		return 1;
-	}
+    WSADATA wsaData;
 
-	// ポートは固定
-	unsigned short portNumber = 8080;
-	printf("ポート : %d\n", portNumber);
-	// IPアドレス
-	char IPAddr[1024] = { "192.168.137.1" };
-	printf("IPアドレス : %s\n", IPAddr);
+    // WinSockの初期化
+    if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0) {
+        // 初期化エラー
+        printf("WinSockの初期化に失敗しました\n");
+        return 1;
+    }
 
-	/* ソケット作成 */
-	SOCKET sockfd = CreateSocket();
+    // クライアントとして起動
+    ChatClient();
 
-	/* サーバーを名前で取得する */
-	HOSTENT* lpHost = GetHostByNameOrAddress(IPAddr);
+    // WinSockの終了処理
+    WSACleanup();
 
-	/* クラインとソケットをサーバーに接続 */
-	ConnectToServer(sockfd, IPAddr, portNumber);
-
-
-	// サーバー側との文字列のやりとり
-	while (1) {
-		int nRcv = 0;
-		char szBuf[1024]{};
-
-		printf("送信 : ");
-		scanf_s("%s", szBuf, 1024);
-		fflush(stdin);
-
-		send(sockfd, szBuf, (int)strlen(szBuf), 0);
-
-		nRcv = recv(sockfd, szBuf, sizeof(szBuf) - 1, 0);
-		if (nRcv > 0) {
-			szBuf[nRcv] = '\0';
-			printf("受信 : %s\n", szBuf);
-		}
-		else {
-			printf("サーバーからの受信に失敗しました\n");
-			break;
-		}
-	}
-
-
-	closesocket(sockfd);
-	WSACleanup();
-	return 0;
+    return 0;
 }
-
+//eof
